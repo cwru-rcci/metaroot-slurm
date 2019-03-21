@@ -1,0 +1,13 @@
+venv
+dist
+docs
+.idea
+__pycache__
+MANIFEST.in
+*.yml
+*.yaml
+*.log
+*.sh
+*.pyc
+*.db
+*.html
