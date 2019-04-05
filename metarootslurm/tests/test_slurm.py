@@ -173,13 +173,13 @@ class SlurmManagerTest(unittest.TestCase):
         # Assert success when account exists
         sam.add_group(test_account)
         result = sam.exists_group(test_account["name"])
-        self.assertEqual(True, result.is_success())
+        self.assertEqual(True, result.response)
 
         sam.delete_group(test_account["name"])
 
         # Assert fail when account does not exist
-        result = sam.delete_group(test_account["name"])
-        self.assertEqual(False, result.is_success())
+        result = sam.exists_group(test_account["name"])
+        self.assertEqual(False, result.response)
 
     #@unittest.skip
     def test_add_user(self):
@@ -232,6 +232,7 @@ class SlurmManagerTest(unittest.TestCase):
         sam.delete_group(test_account2["name"])
         sam.delete_group(test_account["name"])
 
+    #@unittest.skip
     def test_disassociate_user_from_group(self):
         sam = SlurmManager()
         test_account = SlurmManagerTest.get_test_account()
@@ -390,12 +391,12 @@ class SlurmManagerTest(unittest.TestCase):
 
         # Assert success when user exists
         result = sam.exists_user(test_user["name"])
-        self.assertEqual(True, result.is_success())
+        self.assertEqual(True, result.response)
 
         # Assert fail when user does not exist
         sam.delete_user(test_user["name"])
         result = sam.exists_user(test_user["name"])
-        self.assertEqual(False, result.is_success())
+        self.assertEqual(False, result.response)
 
         # Cleanup
         sam.delete_group(test_account["name"])
