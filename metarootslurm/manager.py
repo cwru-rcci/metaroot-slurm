@@ -360,6 +360,36 @@ class SlurmManager:
 
         return Result(0, account)
 
+    def list_groups(self):
+        """
+        Retrieve the names of all SLURM accounts in the database
+
+        Returns
+        ---------
+        Result
+            Result.status is 0 for success, >0 on error
+            Result.response is an array of account names defined in the database
+        """
+        self._logger.info("list_groups")
+
+        cmd = self._sacctmgr + " -P list account"
+        stdout = self.__run_cmd2__(cmd)
+        accounts = []
+
+        if stdout is None:
+            self._logger.error("Command %s requested STDOUT but returned None", cmd)
+            return Result(1, accounts)
+        else:
+            lines = stdout.splitlines()
+            for i in range(1, len(lines)):
+                if lines[i] is not '':
+                    tokens = lines[i].split("|")
+                    accounts.append(tokens[0])
+
+            self._logger.debug(accounts)
+
+        return Result(0, accounts)
+
     def get_members(self, name: str) -> Result:
         """
         Retrieve the user names of all users that are associated with the account
@@ -463,6 +493,7 @@ class SlurmManager:
         ---------
         Result
             Result.status is 0 for success, >0 on error
+            Result.response is True for exists, False for does not exist
         """
         self._logger.info("exists_account {0}".format(name))
 
@@ -470,8 +501,8 @@ class SlurmManager:
         stdout = self.__run_cmd2__(cmd)
         if stdout is not None:
             if len(stdout.splitlines()) == 1:
-                return Result(0, None)
-        return Result(1, None)
+                return Result(0, True)
+        return Result(1, False)
 
     def add_user(self, user_atts: dict) -> Result:
         """
@@ -569,6 +600,36 @@ class SlurmManager:
             self._logger.debug(user)
         return Result(0, user)
 
+    def list_users(self):
+        """
+        Retrieve the names of all SLURM users in the database
+
+        Returns
+        ---------
+        Result
+            Result.status is 0 for success, >0 on error
+            Result.response is an array of user names defined in the database
+        """
+        self._logger.info("list_users")
+
+        cmd = self._sacctmgr + " -P list user"
+        stdout = self.__run_cmd2__(cmd)
+        users = []
+
+        if stdout is None:
+            self._logger.error("Command %s requested STDOUT but returned None", cmd)
+            return Result(1, users)
+        else:
+            lines = stdout.splitlines()
+            for i in range(1, len(lines)):
+                if lines[i] is not '':
+                    tokens = lines[i].split("|")
+                    users.append(tokens[0])
+
+            self._logger.debug(users)
+
+        return Result(0, users)
+
     def delete_user(self, name: str) -> Result:
         """
         Delete a user from SLURM.
@@ -602,6 +663,7 @@ class SlurmManager:
         ---------
         Result
             Result.status is 0 for success, >0 on error
+            Result.response is True for exists, False for does not exist
         """
         self._logger.info("exists_user {0}".format(name))
 
@@ -609,8 +671,8 @@ class SlurmManager:
         stdout = self.__run_cmd2__(cmd)
         if stdout is not None:
             if len(stdout.splitlines()) == 1:
-                return Result(0, None)
-        return Result(1, None)
+                return Result(0, True)
+        return Result(1, False)
 
     def set_user_default_group(self, user_name: str, group_name: str) -> Result:
         """
