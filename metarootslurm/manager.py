@@ -315,6 +315,13 @@ class SlurmManager:
         """
         self._logger.info("add_account {0}".format(group_atts))
         account = SlurmAccount(group_atts, self._schema)
+
+        exists_group = self.exists_group(account.name())
+        if exists_group.is_error():
+            return Result(1, "Error checking for existence of group")
+        elif exists_group.response is True:
+            return Result(0, "Group already exists")
+
         cmd = self._sacctmgr+" -i -Q create account {0}".format(account)
         status = self.__run_cmd__(cmd)
         return Result(status, None)
@@ -356,6 +363,13 @@ class SlurmManager:
             data_tokens = lines[1].split('|')
             for i in range(len(header_tokens)):
                 account[header_tokens[i]] = data_tokens[i]
+
+            # Add group members to returned object
+            account["memberUid"] = []
+            member_result = self.get_members(name)
+            if member_result.is_success():
+                account["memberUid"] = member_result.response
+
             self._logger.debug(account)
 
         return Result(0, account)
@@ -464,6 +478,13 @@ class SlurmManager:
         """
         self._logger.info("delete_account {0}".format(name))
 
+        # If group does not exist, return success but provide informational message
+        exists_group = self.exists_group(name)
+        if exists_group.is_error():
+            return Result(1, None)
+        elif exists_group.response is False:
+            return Result(0, "Group does not exist")
+
         # Get current account members
         get_members = self.get_members(name)
         if get_members.is_error():
@@ -502,6 +523,8 @@ class SlurmManager:
         if stdout is not None:
             if len(stdout.splitlines()) == 1:
                 return Result(0, True)
+            else:
+                return Result(0, False)
         return Result(1, False)
 
     def add_user(self, user_atts: dict) -> Result:
@@ -527,8 +550,10 @@ class SlurmManager:
 
         # If the user already exists, do nothing
         result = self.exists_user(user.name())
-        if result.is_success():
-            return Result(0, None)
+        if result.is_error():
+            return Result(1, "Error testing user exists")
+        elif result.response is True:
+            return Result(0, "User already exists")
 
         # Otherwise, add the user
         cmd = self._sacctmgr+" -i create user {0}".format(user)
@@ -646,6 +671,12 @@ class SlurmManager:
         """
         self._logger.info("delete_user {0}".format(name))
 
+        exists_user = self.exists_user(name)
+        if exists_user.is_error():
+            return Result(1, "Error testing user exists")
+        elif exists_user.response is False:
+            return Result(0, "User does not exist")
+
         cmd = self._sacctmgr+" -i delete user name="+name
         status = self.__run_cmd__(cmd)
         return Result(status, None)
@@ -671,8 +702,12 @@ class SlurmManager:
         stdout = self.__run_cmd2__(cmd)
         if stdout is not None:
             if len(stdout.splitlines()) == 1:
+                self._logger.debug("User %s does exist", name)
                 return Result(0, True)
-        return Result(1, False)
+            else:
+                self._logger.debug("User %s does NOT exist", name)
+                return Result(0, False)
+        return Result(1, "Command Error")
 
     def set_user_default_group(self, user_name: str, group_name: str) -> Result:
         """
