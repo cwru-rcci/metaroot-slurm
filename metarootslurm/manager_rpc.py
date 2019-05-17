@@ -11,6 +11,31 @@ class SlurmManager(RPCClient):
     def __init__(self):
         super().__init__(get_config(self.__class__.__name__))
 
+    def __enter__(self):
+        """
+        Connect the RPC client to the message queue if manager is instantiated by a with statement
+        """
+        self.connect()
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        """
+        Disconnects the RPC client from the message queue when with statement block is exited
+        """
+        self.close()
+
+    def initialize(self):
+        """
+        Connects the RPC client to the message queue
+        """
+        self.connect()
+
+    def finalize(self):
+        """
+        Disconnects the RPC client fomr the message queue
+        """
+        self.close()
+
     def add_group(self, group_atts) -> Result:
         """
         An RPC wrapper to the method metaroot.slurm.manager.SlurmManager.add_group
@@ -182,6 +207,28 @@ class SlurmManager(RPCClient):
                    'user_name': user_name,
                    'group_name': group_name,
                    }
+        return self.send(request)
+
+    def list_groups(self) -> Result:
+        """
+        An RPC wrapper to the method metaroot.slurm.manager.SlurmManager.list_groups
+
+        See Also
+        --------
+        metaroot.slurm.manager.SlurmManager.list_groups
+        """
+        request = {'action': 'list_groups'}
+        return self.send(request)
+
+    def list_users(self) -> Result:
+        """
+        An RPC wrapper to the method metaroot.slurm.manager.SlurmManager.list_users
+
+        See Also
+        --------
+        metaroot.slurm.manager.SlurmManager.list_users
+        """
+        request = {'action': 'list_users'}
         return self.send(request)
 
     def update_group(self, group_atts) -> Result:
