@@ -299,6 +299,30 @@ class SlurmManager:
             self._logger.debug("\"{0}\" returned {1}".format(cmd, cp.returncode))
             return cp.stdout.decode("utf-8")
 
+    def __enter__(self):
+        """
+        A stub for use with context managers
+        """
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        """
+        A stub for use with context managers
+        """
+        pass
+
+    def initialize(self):
+        """
+        A stub required by the manager contract, but only relevant to RPC versions
+        """
+        pass
+
+    def finalize(self):
+        """
+        A stub required by the manager contract, but only relevant to RPC versions
+        """
+        pass
+
     def add_group(self, group_atts: dict) -> Result:
         """
         Add a new SLURM account
