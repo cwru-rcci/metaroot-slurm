@@ -228,21 +228,21 @@ class SlurmManager:
         if config is not None:
             self._logger = get_logger(self.__class__.__name__,
                                       config.get_log_file(),
-                                      config.get_mq_file_verbosity(),
-                                      config.get_mq_screen_verbosity())
+                                      config.get_file_verbosity(),
+                                      config.get_screen_verbosity())
 
-            if config.has("METAROOT_SACCTMGR_PATH"):
-                self._sacctmgr = config.get("METAROOT_SACCTMGR_PATH")
+            if config.has("SACCTMGR_PATH"):
+                self._sacctmgr = config.get("SACCTMGR_PATH")
             else:
                 self._logger.warning("The configuration does not specify a path to sacctmgr via the key " +
-                                     "METAROOT_SACCTMGR_PATH. Will use the default path /usr/bin/sacctmgr")
+                                     "SACCTMGR_PATH. Will use the default path /usr/bin/sacctmgr")
                 self._sacctmgr = "/usr/bin/sacctmgr"
 
-            if config.has("METAROOT_SACCT_SCHEMA"):
-                self._schema = config.get("METAROOT_SACCT_SCHEMA")
+            if config.has("SACCT_SCHEMA"):
+                self._schema = config.get("SACCT_SCHEMA")
             else:
                 self._logger.warning("The configuration does not specify a SLURM account schema via the key " +
-                                     "METAROOT_SACCT_SCHEMA. Will use the default schema")
+                                     "SACCT_SCHEMA. Will use the default schema")
                 self._schema = default_slurm_account_schema
 
         else:
