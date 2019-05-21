@@ -6,6 +6,7 @@ __pycache__
 MANIFEST.in
 *.yml
 *.yaml
+!metaroot-integration-tests.yaml
 *.log
 *.sh
 *.pyc

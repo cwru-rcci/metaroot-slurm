@@ -1,0 +1,41 @@
+METAROOT:
+    GLOBAL:
+        MQUSER: not-set # You need to set these by editing this file or via environment variables
+        MQPASS: not-set #
+        MQHOST: 127.0.0.1
+        MQPORT: 5672
+        LOG_FILE: $NONE
+        FILE_VERBOSITY: ERROR
+        SCREEN_VERBOSITY: WARN
+
+    # RPC client that makes request to edit the SLURM database
+    SLURMMANAGER:
+        MQNAME : slurm_test
+        SACCTMGR_PATH : "/usr/bin/sacctmgr"
+        SACCT_SCHEMA:
+            "Organization": 1
+            "Cluster": 1
+            "DefaultQOS": 1
+            "Fairshare": 1
+            "GrpTRESMins": 1
+            "GrpTRESRunMins": 1
+            "GrpTRES": 1
+            "GrpJobs": 1
+            "GrpJobsAccrue": 0
+            "GrpSubmitJobs": 1
+            "GrpWall": 1
+            "GrpCPUS": 1
+            "ID": 1
+            "LFT": 1
+            "MaxTRESMins": 1
+            "MaxTRES": 1
+            "MaxJobs": 1
+            "MaxJobsAccrue": 0
+            "MaxSubmitJobs": 1
+            "MaxWall": 1
+            "Qos": 1
+            "ParentID": 1
+            "ParentName": 1
+            "Partition": 1
+            "WithRawQOSLevel": 0
+            "RGT": 1
