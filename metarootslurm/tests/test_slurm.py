@@ -61,7 +61,6 @@ class SlurmManagerTest(unittest.TestCase):
 
         return ta_attr
 
-    @unittest.skip
     def test_add_group(self):
         with SlurmManager() as sam:
             test_account = SlurmManagerTest.get_test_account()
@@ -212,11 +211,11 @@ class SlurmManagerTest(unittest.TestCase):
             result = sam.associate_user_to_group(test_user["name"], test_account2["name"])
             self.assertEqual(True, result.is_success())
 
-            # Assert failure when association already exists
+            # Assert success when association already exists
             result = sam.associate_user_to_group(test_user["name"], test_account["name"])
-            self.assertEqual(False, result.is_success())
+            self.assertEqual(True, result.is_success())
             result = sam.associate_user_to_group(test_user["name"], test_account2["name"])
-            self.assertEqual(False, result.is_success())
+            self.assertEqual(True, result.is_success())
 
             # Cleanup (remove secondary association first)
             sam.delete_user(test_user["name"])
