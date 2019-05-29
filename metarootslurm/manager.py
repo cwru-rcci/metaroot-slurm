@@ -268,10 +268,19 @@ class SlurmManager:
             return 456
 
         if cp.returncode != 0:
-            self._logger.error("CMD: {0}".format("\"{0}\"".format(cmd)))
-            self._logger.error("STDOUT: {0}".format(cp.stdout.decode("utf-8")))
-            self._logger.error("STDERR: {0}".format(cp.stderr.decode("utf-8")))
-            self._logger.error("Command failed with exit status %d", cp.returncode)
+            # SLURM returns 1 if the requested operation would not change anything. This is sometimes related to an
+            # error, but if STDERR is empty and STDOUT is " Nothing new added.\n", then the operation was simply deemed
+            # unnecessary and we return 0
+            if cp.returncode == 1 and \
+               cp.stderr.decode("utf-8") == "" and \
+               cp.stdout.decode("utf-8") == " Nothing new added.\n":
+                self._logger.warning("Treating exit status 1 as 0 based on STDOUT %s", cp.stdout.decode("utf-8"))
+                return 0
+            else:
+                self._logger.error("CMD: {0}".format("\"{0}\"".format(cmd)))
+                self._logger.error("STDOUT: {0}".format(cp.stdout.decode("utf-8")))
+                self._logger.error("STDERR: {0}".format(cp.stderr.decode("utf-8")))
+                self._logger.error("Command failed with exit status %d", cp.returncode)
         else:
             self._logger.debug("\"{0}\" returned {1}".format(cmd, cp.returncode))
 
