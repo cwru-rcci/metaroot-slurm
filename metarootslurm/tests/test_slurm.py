@@ -1,5 +1,8 @@
+import os
 import unittest
 from metarootslurm.manager_rpc import SlurmManager
+
+cluster = os.getenv("METAROOT_CLUSTER")
 
 
 class SlurmManagerTest(unittest.TestCase):
@@ -9,55 +12,66 @@ class SlurmManagerTest(unittest.TestCase):
     """
     @staticmethod
     def get_test_account():
+        global cluster
         ta_attr = {"name": "test_acct",
                    "Org": 'org1',
                    "Share": 5,
                    "MaxWall": "13-12",
                    "MaxSubmit": 2000,
-                   "MaxJobs": 1000}
+                   "MaxJobs": 1000,
+                   "Cluster": cluster}
 
         return ta_attr
 
     @staticmethod
     def get_test_account2():
+        global cluster
         ta_attr = {"name": "test_acct2",
                    "Org": 'org2',
                    "Share": 5,
                    "MaxWall": "13-12",
-                   "MaxSubmit": 2000}
+                   "MaxSubmit": 2000,
+                   "Cluster": cluster}
 
         return ta_attr
 
     @staticmethod
     def get_test_user():
+        global cluster
         ta_name = "test_acct"
         tu_name = "test_user"
-        tu_attr = {"name": tu_name, "DefaultAccount": ta_name}
+        tu_attr = {"name": tu_name, "DefaultAccount": ta_name, "Cluster": cluster}
 
         return tu_attr
 
     @staticmethod
     def get_test_user2():
+        global cluster
         ta_name = "test_acct"
         tu_name = "test_user"
         tu_attr = {"name": tu_name,
                    "MaxJobs": 300,
-                   "Account": ta_name}
+                   "Account": ta_name,
+                   "Cluster": cluster}
 
         return tu_attr
 
     @staticmethod
     def get_named_user(user_name: str, account_name: str):
+        global cluster
         tu_attr = {"name": user_name,
                    "MaxJobs": 300,
-                   "Account": account_name}
+                   "Account": account_name,
+                   "Cluster": cluster}
         return tu_attr
 
     @staticmethod
     def get_test_update_account():
+        global cluster
         ta_name = "test_acct"
         ta_attr = {"name": ta_name,
-                   "MaxSubmit": 4000}
+                   "MaxSubmit": 4000,
+                   "Cluster": cluster}
 
         return ta_attr
 
@@ -198,23 +212,23 @@ class SlurmManagerTest(unittest.TestCase):
             test_user = SlurmManagerTest.get_test_user()
 
             # Assert failure when neither exists
-            result = sam.associate_user_to_group(test_user["name"], test_account["name"])
+            result = sam.associate_user_to_group(test_user["name"], test_account["Cluster"]+':'+test_account["name"])
             self.assertEqual(False, result.is_success())
 
             # Assert success when creating user and assigning association
             sam.add_group(test_account)
-            result = sam.associate_user_to_group(test_user["name"], test_account["name"])
+            result = sam.associate_user_to_group(test_user["name"], test_account["Cluster"]+':'+test_account["name"])
             self.assertEqual(True, result.is_success())
 
             # Assert success when creating an secondary association
             sam.add_group(test_account2)
-            result = sam.associate_user_to_group(test_user["name"], test_account2["name"])
+            result = sam.associate_user_to_group(test_user["name"], test_account["Cluster"]+':'+test_account2["name"])
             self.assertEqual(True, result.is_success())
 
             # Assert success when association already exists
-            result = sam.associate_user_to_group(test_user["name"], test_account["name"])
+            result = sam.associate_user_to_group(test_user["name"], test_account["Cluster"]+':'+test_account["name"])
             self.assertEqual(True, result.is_success())
-            result = sam.associate_user_to_group(test_user["name"], test_account2["name"])
+            result = sam.associate_user_to_group(test_user["name"], test_account["Cluster"]+':'+test_account2["name"])
             self.assertEqual(True, result.is_success())
 
             # Cleanup (remove secondary association first)
@@ -230,9 +244,9 @@ class SlurmManagerTest(unittest.TestCase):
 
             # Create user, accounts and affiliations
             sam.add_group(test_account)
-            sam.associate_user_to_group(test_user["name"], test_account["name"])
+            sam.associate_user_to_group(test_user["name"], test_account["Cluster"]+':'+test_account["name"])
             sam.add_group(test_account2)
-            sam.associate_user_to_group(test_user["name"], test_account2["name"])
+            sam.associate_user_to_group(test_user["name"], test_account["Cluster"]+':'+test_account2["name"])
 
             # disassociate from primary (assert success)
             result = sam.disassociate_user_from_group(test_user["name"], test_account["name"])
@@ -279,7 +293,7 @@ class SlurmManagerTest(unittest.TestCase):
             #sam.set_user_default_group(test_user3["name"], test_account["name"])
 
             # Create a "secondary" affiliation of user2 to the first account
-            sam.associate_user_to_group(test_user2["name"], test_account["name"])
+            sam.associate_user_to_group(test_user2["name"], test_account["Cluster"]+':'+test_account["name"])
 
             # disassociate from primary (assert success)
             result = sam.disassociate_users_from_group([test_user1["name"], test_user2["name"], test_user3["name"]],
@@ -339,9 +353,9 @@ class SlurmManagerTest(unittest.TestCase):
 
             # Create user, accounts and affiliations
             sam.add_group(test_account)
-            sam.associate_user_to_group(test_user["name"], test_account["name"])
+            sam.associate_user_to_group(test_user["name"], test_account["Cluster"]+':'+test_account["name"])
             sam.add_group(test_account2)
-            sam.associate_user_to_group(test_user["name"], test_account2["name"])
+            sam.associate_user_to_group(test_user["name"], test_account2["Cluster"]+':'+test_account2["name"])
 
             # Check some expected user attributes
             result = sam.get_user(test_user["name"])
