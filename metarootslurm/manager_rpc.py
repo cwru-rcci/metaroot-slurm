@@ -220,7 +220,7 @@ class SlurmManager(RPCClient):
         request = {'action': 'list_groups'}
         return self.send(request)
 
-    def list_users(self) -> Result:
+    def list_users(self, with_default_group: str) -> Result:
         """
         An RPC wrapper to the method metaroot.slurm.manager.SlurmManager.list_users
 
@@ -228,7 +228,8 @@ class SlurmManager(RPCClient):
         --------
         metaroot.slurm.manager.SlurmManager.list_users
         """
-        request = {'action': 'list_users'}
+        request = {'action': 'list_users',
+                   'with_default_group': with_default_group}
         return self.send(request)
 
     def update_group(self, group_atts) -> Result:

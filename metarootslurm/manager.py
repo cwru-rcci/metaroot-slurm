@@ -66,7 +66,7 @@ class SlurmAccount:
             elif key in valid_keys and valid_keys[key] == 0:
                 pass
             else:
-                raise Exception("Invalid attribute key specified for Account: "+key)
+                raise Exception("Invalid attribute key specified for Account: " + key)
 
     def __str__(self):
         """
@@ -77,7 +77,7 @@ class SlurmAccount:
         str
             The account as a string that can be passed to SLURM add command, e.g. name=foo att1=val att2=val ...
         """
-        r = "name="+self._name
+        r = "name=" + self._name
         for key in self._attr:
             r += " " + key + "=" + self._attr[key]
         return r
@@ -91,8 +91,14 @@ class SlurmAccount:
         str
             The account as a string that can be passed to SLURM modify command, e.g. WHERE name=foo SET att1=val ...
         """
-        r = "where name=" + self._name + " set"
+        r = "where name=" + self._name
+        if "Cluster" in self._attr:
+            r = r + " cluster="+self._attr['Cluster']
+        r = r + " set"
+
         for key in self._attr:
+            if key == 'Cluster':
+                continue
             r += " " + key + "=" + self._attr[key]
         return r
 
@@ -124,6 +130,20 @@ class SlurmAccount:
             fmt_string = fmt_string + key
         return fmt_string
 
+    def cluster(self):
+        """
+        Convenience function to return the target SLURM cluster
+
+        Returns
+        ----------
+        str
+            The cluster name if defined. None otherwise.
+        """
+        if 'Cluster' in self._attr:
+            return self._attr['Cluster']
+        else:
+            return None
+
 
 class SlurmUser:
     """
@@ -135,7 +155,8 @@ class SlurmUser:
     # Define a set of optional valid attributes that we allow to be associated with a SlurmUser instance
     valid_keys = {"DefaultAccount": True,
                   "Account": True,
-                  "MaxJobs": True}
+                  "MaxJobs": True,
+                  "Cluster": True}
 
     def __init__(self, attrs: dict):
         """
@@ -160,7 +181,7 @@ class SlurmUser:
             elif key in SlurmUser.valid_keys:
                 self._attr[key] = str(attrs[key])
             else:
-                raise Exception("Invalid attribute key specified for User: "+key)
+                raise Exception("Invalid attribute key specified for User: " + key)
 
     def __str__(self):
         """
@@ -171,7 +192,7 @@ class SlurmUser:
         str
             The user formatted into a string that can be passed to SLURM add command, e.g. name=foo defaultaccount=bar
         """
-        r = "name="+self._name
+        r = "name=" + self._name
         for key in self._attr:
             r += " " + key + "=" + self._attr[key]
         return r
@@ -189,12 +210,14 @@ class SlurmUser:
         # Build the "WHERE name=${username} [AND account=${accountname}] SET..." portion of command
         r = "where name=" + self._name
         if 'Account' in self._attr:
-            r = r + " account="+self._attr['Account']
+            r = r + " account=" + self._attr['Account']
+        if 'Cluster' in self._attr:
+            r = r + " cluster=" + self._attr['Cluster']
         r = r + " set"
 
         for key in self._attr:
             # Don't add Account in the set portion of the command if it is present
-            if key == 'Account':
+            if key == 'Account' or key == 'Cluster':
                 continue
             r += " " + key + "=" + self._attr[key]
         return r
@@ -209,6 +232,20 @@ class SlurmUser:
             The user name
         """
         return self._name
+
+    def cluster(self):
+        """
+        Convenience function to return the target SLURM cluster
+
+        Returns
+        ----------
+        str
+            The cluster name if defined. None otherwise.
+        """
+        if 'Cluster' in self._attr:
+            return self._attr['Cluster']
+        else:
+            return None
 
 
 class SlurmManager:
@@ -245,6 +282,14 @@ class SlurmManager:
                                      "SACCT_SCHEMA. Will use the default schema")
                 self._schema = default_slurm_account_schema
 
+            if config.has("DEFAULT_CLUSTER"):
+                self._cluster = config.get("DEFAULT_CLUSTER")+":"
+            else:
+                self._cluster = ""
+
+            self._block_delete = False
+            if config.has("BLOCK_DELETE"):
+                self._block_delete = True
         else:
             print("**************************************************************")
             print("The configuration file metaroot[-test].yaml could not be found")
@@ -256,6 +301,8 @@ class SlurmManager:
                                       "DEBUG")
             self._sacctmgr = "/usr/bin/sacctmgr"
             self._schema = default_slurm_account_schema
+            self._cluster = ""
+            self._block_delete = True
 
     # Runs the argument command and returns the exist status. Attempts to suppress all output.
     def __run_cmd__(self, cmd: str):
@@ -272,8 +319,8 @@ class SlurmManager:
             # error, but if STDERR is empty and STDOUT is " Nothing new added.\n", then the operation was simply deemed
             # unnecessary and we return 0
             if cp.returncode == 1 and \
-               cp.stderr.decode("utf-8") == "" and \
-               cp.stdout.decode("utf-8") == " Nothing new added.\n":
+                    cp.stderr.decode("utf-8") == "" and \
+                    (cp.stdout.decode("utf-8") == " Nothing new added.\n" or cp.stdout.decode("utf-8") == " Nothing deleted\n"):
                 self._logger.warning("Treating exit status 1 as 0 based on STDOUT %s", cp.stdout.decode("utf-8"))
                 return 0
             else:
@@ -355,7 +402,18 @@ class SlurmManager:
         elif exists_group.response is True:
             return Result(0, "Group already exists")
 
-        cmd = self._sacctmgr+" -i -Q create account {0}".format(account)
+        # base command
+        cmd = self._sacctmgr + " -i -Q add account name={0}".format(account.name())
+
+        # add cluster if one has been defined. not specifying a cluster creates associations for all clusters
+        if account.cluster() is not None:
+            cmd = cmd + " cluster={0}".format(account.cluster())
+
+        status = self.__run_cmd__(cmd)
+        if status > 0:
+            return Result(status, None)
+
+        cmd = self._sacctmgr + " -i modify account {0}".format(account.as_update_str())
         status = self.__run_cmd__(cmd)
         return Result(status, None)
 
@@ -381,7 +439,7 @@ class SlurmManager:
         group_atts.update(self._schema)
         account = SlurmAccount(group_atts, self._schema)
 
-        cmd = self._sacctmgr+" -P list account WithAssoc name='" + name + "' user='' format='Account,"+account.format_string()+"'"
+        cmd = self._sacctmgr + " -P list account WithAssoc name='" + name + "' format='Account,User," + account.format_string() + "'"
         stdout = self.__run_cmd2__(cmd)
         account = {}
 
@@ -389,13 +447,19 @@ class SlurmManager:
             self._logger.error("Command %s requested STDOUT but returned None", cmd)
         else:
             lines = stdout.splitlines()
-            if len(lines) is not 2:
+            if len(lines) < 2:
                 return Result(1, account)
 
             header_tokens = lines[0].split('|')
-            data_tokens = lines[1].split('|')
-            for i in range(len(header_tokens)):
-                account[header_tokens[i]] = data_tokens[i]
+            for j in range(1, len(lines)):
+                data_tokens = lines[j].split('|')
+                if data_tokens[1] == "":
+                    for i in range(len(header_tokens)):
+                        account[header_tokens[i]] = data_tokens[i]
+                    break
+
+            if len(account) == 0:
+                return Result(1, account)
 
             # Add group members to returned object
             account["memberUid"] = []
@@ -455,7 +519,7 @@ class SlurmManager:
         """
         self._logger.info("get_members {0}".format(name))
 
-        cmd = self._sacctmgr+" -P list account WithAssoc name='" + name + "' format='User'"
+        cmd = self._sacctmgr + " -P list account WithAssoc name='" + name + "' format='User'"
         stdout = self.__run_cmd2__(cmd)
         members = []
 
@@ -490,7 +554,7 @@ class SlurmManager:
         self._logger.info("update_account {0}".format(group_atts))
 
         account = SlurmAccount(group_atts, self._schema)
-        cmd = self._sacctmgr+" -i modify account {0}".format(account.as_update_str())
+        cmd = self._sacctmgr + " -i modify account {0}".format(account.as_update_str())
         status = self.__run_cmd__(cmd)
         return Result(status, None)
 
@@ -511,6 +575,10 @@ class SlurmManager:
         """
         self._logger.info("delete_account {0}".format(name))
 
+        # If delete operations are disabled
+        if self._block_delete:
+            return Result(1, "Delete operations on users and groups are disabled")
+
         # If group does not exist, return success but provide informational message
         exists_group = self.exists_group(name)
         if exists_group.is_error():
@@ -530,7 +598,7 @@ class SlurmManager:
             return Result(2, None)
 
         # Remove the account
-        cmd = self._sacctmgr+" -i delete account name="+name
+        cmd = self._sacctmgr + " -i delete account name=" + name
         status = self.__run_cmd__(cmd)
         return Result(status, None)
 
@@ -551,7 +619,7 @@ class SlurmManager:
         """
         self._logger.info("exists_account {0}".format(name))
 
-        cmd = self._sacctmgr+" -n list account name=" + name
+        cmd = self._sacctmgr + " -n list account name=" + name
         stdout = self.__run_cmd2__(cmd)
         if stdout is not None:
             if len(stdout.splitlines()) == 1:
@@ -589,7 +657,7 @@ class SlurmManager:
             return Result(0, "User already exists")
 
         # Otherwise, add the user
-        cmd = self._sacctmgr+" -i create user {0}".format(user)
+        cmd = self._sacctmgr + " -i create user {0}".format(user)
         status = self.__run_cmd__(cmd)
         return Result(status, None)
 
@@ -612,13 +680,16 @@ class SlurmManager:
         self._logger.info("update_user {0}".format(user_atts))
 
         user = SlurmUser(user_atts)
-        cmd = self._sacctmgr+" -i modify user {0}".format(user.as_update_str())
+        cmd = self._sacctmgr + " -i modify user {0}".format(user.as_update_str())
         status = self.__run_cmd__(cmd)
         return Result(status, None)
 
     def get_user(self, name: str) -> Result:
         """
-        Retrieve the current configuration of a user
+        Retrieve the current configuration of a user. This method first enumerates associations for the user+account
+        to identify limits set on the user specifically. It then enumerates associations of the account and populates
+        all empty values from the user associations with limits set on the account. This mimics how SLURM internally
+        applies the user/account limits to report a full specification.
 
         Parameters
         ----------
@@ -635,11 +706,22 @@ class SlurmManager:
             will be returned.
         """
         self._logger.info("get_user {0}".format(name))
+
+        # Test for user existence first
+        exists_result = self.exists_user(name)
+        if exists_result.is_error():
+            return Result(1, "Test for user exists prior to get operation resulted in an error")
+        elif exists_result.response is False:
+            return Result(0, {})
+
+        # It seems like they exist, so prepare to list their associations
         account = SlurmAccount(self._schema, self._schema)
-        cmd = self._sacctmgr+" -P list user WithAssoc name='" + name + "' format='Account,DefaultAccount," + account.format_string() + "'"
+        cmd = self._sacctmgr + " -P list user WithAssoc name='" + name + "' format='Account,DefaultAccount," + account.format_string() + "'"
         stdout = self.__run_cmd2__(cmd)
         user = {}
 
+        # First retrieve the user associations
+        account_names = []
         if stdout is None:
             self._logger.error("Command %s requested STDOUT but returned None", cmd)
             return Result(1, user)
@@ -650,17 +732,53 @@ class SlurmManager:
 
             for j in range(1, len(lines)):
                 data_tokens = lines[j].split('|')
-                account = {}
+                account_atts = {}
                 user['default'] = data_tokens[1]
                 for i in range(len(header_tokens)):
-                    account[header_tokens[i]] = data_tokens[i]
-                user[data_tokens[0]] = account
+                    account_atts[header_tokens[i]] = data_tokens[i]
+                user[data_tokens[0]] = account_atts
+                account_names.append(data_tokens[0])
             self._logger.debug(user)
+
+        # Then, retrieve the group associations and fill in empty values in the user associations with the values from
+        # the group associations (which is what SLURM does to enforce group limits when no user limit is specified)
+        cmd = self._sacctmgr + " -P show account where name=" + ",".join(account_names) + " withassoc " + \
+                               " format='Account,DefaultAccount,User," + account.format_string() + "'"
+        stdout = self.__run_cmd2__(cmd)
+        if stdout is None:
+            self._logger.error("Command %s requested STDOUT but returned None", cmd)
+            return Result(1, "Could not add account global limits to user limits")
+        else:
+            lines = stdout.splitlines()
+
+            # Header line is first line, delimited on |
+            header = lines[0]
+            header_tokens = header.split('|')
+
+            for j in range(1, len(lines)):
+                # Data lines are delimited on |
+                data_tokens = lines[j].split('|')
+
+                # The line where User="" is the group line
+                if data_tokens[2] == "":
+                    for i in range(len(header_tokens)):
+                        if header_tokens[i] not in user[data_tokens[0]] or \
+                           user[data_tokens[0]][header_tokens[i]] == '':
+                            user[data_tokens[0]][header_tokens[i]] = data_tokens[i]
+
+            self._logger.debug(user)
+
         return Result(0, user)
 
-    def list_users(self):
+    def list_users(self, with_default_group: str):
         """
         Retrieve the names of all SLURM users in the database
+
+        Parameters
+        ----------
+        with_default_group: str
+            Either the string "any" meaning any group, or a string id of a group that will restrict the result to only
+            users with the specified group set as their default
 
         Returns
         ---------
@@ -670,7 +788,10 @@ class SlurmManager:
         """
         self._logger.info("list_users")
 
-        cmd = self._sacctmgr + " -P list user"
+        if with_default_group == "any":
+            cmd = self._sacctmgr + " -P list user"
+        else:
+            cmd = self._sacctmgr + " -P list user where defaultaccount=\"" + with_default_group + "\""
         stdout = self.__run_cmd2__(cmd)
         users = []
 
@@ -704,13 +825,17 @@ class SlurmManager:
         """
         self._logger.info("delete_user {0}".format(name))
 
+        # If delete operations are disabled
+        if self._block_delete:
+            return Result(1, "Delete operations on users and groups are disabled")
+
         exists_user = self.exists_user(name)
         if exists_user.is_error():
             return Result(1, "Error testing user exists")
         elif exists_user.response is False:
             return Result(0, "User does not exist")
 
-        cmd = self._sacctmgr+" -i delete user name="+name
+        cmd = self._sacctmgr + " -i delete user name=" + name
         status = self.__run_cmd__(cmd)
         return Result(status, None)
 
@@ -731,7 +856,7 @@ class SlurmManager:
         """
         self._logger.info("exists_user {0}".format(name))
 
-        cmd = self._sacctmgr+" -n list user name=" + name
+        cmd = self._sacctmgr + " -n list user name=" + name
         stdout = self.__run_cmd2__(cmd)
         if stdout is not None:
             if len(stdout.splitlines()) == 1:
@@ -760,7 +885,14 @@ class SlurmManager:
         """
         self._logger.info("set_user_default_account {0}, {1}".format(user_name, group_name))
 
-        cmd = self._sacctmgr+" -i modify user where name=" + user_name + " set defaultaccount=" + group_name
+        if ":" in group_name:
+            parts = group_name.split(":")
+            cluster = " Cluster='"+parts[0]+"'"
+            group_name = parts[1]
+        else:
+            cluster = ""
+
+        cmd = self._sacctmgr + " -i modify user where name=" + user_name + " " + cluster + " set defaultaccount=" + group_name
         status = self.__run_cmd__(cmd)
         return Result(status, None)
 
@@ -773,7 +905,7 @@ class SlurmManager:
         user_name : str
             SLURM user name
         group_name : str
-            SLURM account name
+            SLURM account name, optionally prefixed with cluster name delimited by ':'
 
         Returns
         ---------
@@ -782,7 +914,14 @@ class SlurmManager:
         """
         self._logger.info("associate_user_to_account {0} {1}".format(user_name, group_name))
 
-        cmd = self._sacctmgr+" -i add user name='" + user_name + "' account='" + group_name + "'"
+        if ":" in group_name:
+            parts = group_name.split(":")
+            cluster = " Cluster='"+parts[0]+"'"
+            group_name = parts[1]
+        else:
+            cluster = ""
+
+        cmd = self._sacctmgr + " -i add user name='" + user_name + "' account='" + group_name + "'" + cluster
         status = self.__run_cmd__(cmd)
         return Result(status, None)
 
@@ -817,15 +956,16 @@ class SlurmManager:
         # themself
         elif result.response['default'] == group_name:
             # This can fail if the user already has an association the the bench account
-            self.associate_user_to_group(user_name, 'bench')
+            self.associate_user_to_group(user_name, self._cluster+'bench')
 
             # Move the user to the bench account
-            benched = self.set_user_default_group(user_name, 'bench').is_success()
+            benched = self.set_user_default_group(user_name, self._cluster+'bench').is_success()
             if benched:
-                self._logger.warn("disassociate_user_from_account {0}, {1} -> User was benched".format(user_name, group_name))
+                self._logger.warn(
+                    "disassociate_user_from_account {0}, {1} -> User was benched".format(user_name, group_name))
 
         # Remove the user affiliation
-        cmd = self._sacctmgr+" -i delete user name='" + user_name + "' account='" + group_name + "'"
+        cmd = self._sacctmgr + " -i delete user name='" + user_name + "' account='" + group_name + "'"
         status = self.__run_cmd__(cmd)
         return Result(status, benched)
 
