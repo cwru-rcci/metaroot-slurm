@@ -2,8 +2,11 @@ METAROOT:
     GLOBAL:
         MQUSER: not-set # You need to set these by editing this file or via environment variables
         MQPASS: not-set #
-        MQHOST: 127.0.0.1
-        MQPORT: 5672
+        MQHOST: not-set
+        MQPORT: not-set
+        SSL: TRUE
+        SSL_VERIFY_MODE: NONE
+        SSL_NOCHECK_HOSTNAME: TRUE
         LOG_FILE: $NONE
         FILE_VERBOSITY: ERROR
         SCREEN_VERBOSITY: WARN
@@ -12,6 +15,7 @@ METAROOT:
     SLURMMANAGER:
         MQNAME : slurm_test
         SACCTMGR_PATH : "/usr/bin/sacctmgr"
+        DEFAULT_CLUSTER: not-set
         SACCT_SCHEMA:
             "Organization": 1
             "Cluster": 1
@@ -24,7 +28,7 @@ METAROOT:
             "GrpJobsAccrue": 0
             "GrpSubmitJobs": 1
             "GrpWall": 1
-            "GrpCPUS": 1
+            "GrpCPUs": 1
             "ID": 1
             "LFT": 1
             "MaxTRESMins": 1
